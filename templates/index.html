@@ -10,7 +10,8 @@
     <link rel="icon" type="image/png" href="/icon.png">
     <link rel="apple-touch-icon" href="/icon.png">
     <title>VendorDesk</title>
-    
+    <link rel="manifest" href="/static/manifest.json">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
@@ -514,6 +515,10 @@
                 })
             }).then(() => window.location.reload());
         }
+        if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/sw.js');
+}
+
     </script>
 </body>
 </html>
