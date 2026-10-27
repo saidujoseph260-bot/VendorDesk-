@@ -10,25 +10,41 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'vendordesk-super-secret-key-2026')
 
-# Initialize Supabase
+# Initialize Supabase Credentials
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY environment variables.")
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"Supabase Init Error: {e}")
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 PDF_DIR = 'static'
 if not os.path.exists(PDF_DIR):
     os.makedirs(PDF_DIR)
 
 
+@app.route('/icon.png')
+def serve_icon():
+    """Serves icon whether it is in root or static directory"""
+    if os.path.exists('icon.png'):
+        return send_file('icon.png')
+    elif os.path.exists('static/icon.png'):
+        return send_file('static/icon.png')
+    return "Icon not found", 404
+
+
 def get_current_vendor():
     vendor_id = session.get('vendor_id')
-    if not vendor_id:
+    if not vendor_id or not supabase:
         return None
-    res = supabase.table('vendors').select('*').eq('id', vendor_id).execute()
-    return res.data[0] if res.data else None
+    try:
+        res = supabase.table('vendors').select('*').eq('id', vendor_id).execute()
+        return res.data[0] if res.data else None
+    except Exception:
+        return None
 
 
 @app.route('/')
@@ -37,34 +53,35 @@ def home():
     if not vendor:
         return render_template('index.html', vendor=None)
 
-    # Date Filter Parameters
     time_filter = request.args.get('filter', 'all')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    # Query receipts for this vendor
-    query = supabase.table('receipts').select('*').eq('vendor_id', vendor['id'])
+    try:
+        query = supabase.table('receipts').select('*').eq('vendor_id', vendor['id'])
 
-    now = datetime.utcnow()
-    if time_filter == 'today':
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        query = query.gte('date', today_start)
-    elif time_filter == 'week':
-        week_start = (now - timedelta(days=7)).isoformat()
-        query = query.gte('date', week_start)
-    elif time_filter == 'month':
-        month_start = (now - timedelta(days=30)).isoformat()
-        query = query.gte('date', month_start)
-    elif time_filter == 'year':
-        year_start = (now - timedelta(days=365)).isoformat()
-        query = query.gte('date', year_start)
-    elif time_filter == 'custom' and start_date and end_date:
-        query = query.gte('date', f"{start_date}T00:00:00").lte('date', f"{end_date}T23:59:59")
+        now = datetime.utcnow()
+        if time_filter == 'today':
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            query = query.gte('date', today_start)
+        elif time_filter == 'week':
+            week_start = (now - timedelta(days=7)).isoformat()
+            query = query.gte('date', week_start)
+        elif time_filter == 'month':
+            month_start = (now - timedelta(days=30)).isoformat()
+            query = query.gte('date', month_start)
+        elif time_filter == 'year':
+            year_start = (now - timedelta(days=365)).isoformat()
+            query = query.gte('date', year_start)
+        elif time_filter == 'custom' and start_date and end_date:
+            query = query.gte('date', f"{start_date}T00:00:00").lte('date', f"{end_date}T23:59:59")
 
-    res = query.order('id', desc=True).execute()
-    receipts = res.data if res.data else []
+        res = query.order('id', desc=True).execute()
+        receipts = res.data if res.data else []
+    except Exception as e:
+        print(f"Fetch Error: {e}")
+        receipts = []
 
-    # Calculate Revenue and Invoice Count
     total_revenue = sum(float(r['amount']) for r in receipts if r.get('status') == 'paid')
     total_invoices = len(receipts)
 
@@ -82,51 +99,66 @@ def home():
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.form
-    email = data.get('email').lower().strip()
-    password = data.get('password')
-    business_name = data.get('business_name')
-    phone = data.get('phone')
-    ig_handle = data.get('ig_handle')
-    bank_details = data.get('bank_details')
+    if not supabase:
+        return jsonify({"error": "Database not connected. Check SUPABASE_URL and SUPABASE_KEY in Render."}), 500
 
-    # Check if vendor exists
-    existing = supabase.table('vendors').select('id').eq('email', email).execute()
-    if existing.data:
-        return jsonify({"error": "Email already registered."}), 400
+    try:
+        data = request.form
+        email = data.get('email', '').lower().strip()
+        password = data.get('password')
+        business_name = data.get('business_name')
+        phone = data.get('phone')
+        ig_handle = data.get('ig_handle')
+        bank_details = data.get('bank_details')
 
-    hashed_pw = generate_password_hash(password)
-    new_vendor = {
-        "email": email,
-        "password_hash": hashed_pw,
-        "business_name": business_name,
-        "phone": phone,
-        "ig_handle": ig_handle,
-        "bank_details": bank_details
-    }
+        if not email or not password or not business_name:
+            return jsonify({"error": "Business Name, Email, and Password are required."}), 400
 
-    res = supabase.table('vendors').insert(new_vendor).execute()
-    if res.data:
-        session['vendor_id'] = res.data[0]['id']
-        return jsonify({"status": "success"})
-    return jsonify({"error": "Failed to create account."}), 500
+        # Check existing vendor
+        existing = supabase.table('vendors').select('id').eq('email', email).execute()
+        if existing.data:
+            return jsonify({"error": "Email already registered. Tap Login to sign in."}), 400
+
+        hashed_pw = generate_password_hash(password)
+        new_vendor = {
+            "email": email,
+            "password_hash": hashed_pw,
+            "business_name": business_name,
+            "phone": phone,
+            "ig_handle": ig_handle,
+            "bank_details": bank_details
+        }
+
+        res = supabase.table('vendors').insert(new_vendor).execute()
+        if res.data:
+            session['vendor_id'] = res.data[0]['id']
+            return jsonify({"status": "success"})
+        return jsonify({"error": "Failed to create account."}), 500
+    except Exception as e:
+        return jsonify({"error": f"Database error: {str(e)}"}), 500
 
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.form
-    email = data.get('email').lower().strip()
-    password = data.get('password')
+    if not supabase:
+        return jsonify({"error": "Database not connected."}), 500
 
-    res = supabase.table('vendors').select('*').eq('email', email).execute()
-    if not res.data:
+    try:
+        data = request.form
+        email = data.get('email', '').lower().strip()
+        password = data.get('password')
+
+        res = supabase.table('vendors').select('*').eq('email', email).execute()
+        if not res.data:
+            return jsonify({"error": "Account not found. Please click Register first."}), 400
+
+        vendor = res.data[0]
+        if check_password_hash(vendor['password_hash'], password):
+            session['vendor_id'] = vendor['id']
+            return jsonify({"status": "success"})
         return jsonify({"error": "Invalid email or password."}), 400
-
-    vendor = res.data[0]
-    if check_password_hash(vendor['password_hash'], password):
-        session['vendor_id'] = vendor['id']
-        return jsonify({"status": "success"})
-    return jsonify({"error": "Invalid email or password."}), 400
+    except Exception as e:
+        return jsonify({"error": f"Login error: {str(e)}"}), 500
 
 
 @app.route('/logout')
@@ -141,16 +173,18 @@ def update_profile():
     if not vendor:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.json
-    update_data = {
-        "business_name": data.get('business_name'),
-        "phone": data.get('phone'),
-        "ig_handle": data.get('ig_handle'),
-        "bank_details": data.get('bank_details')
-    }
-
-    supabase.table('vendors').update(update_data).eq('id', vendor['id']).execute()
-    return jsonify({"status": "success"})
+    try:
+        data = request.json
+        update_data = {
+            "business_name": data.get('business_name'),
+            "phone": data.get('phone'),
+            "ig_handle": data.get('ig_handle'),
+            "bank_details": data.get('bank_details')
+        }
+        supabase.table('vendors').update(update_data).eq('id', vendor['id']).execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/add-receipt', methods=['POST'])
@@ -159,19 +193,21 @@ def add_receipt():
     if not vendor:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.json
-    new_receipt = {
-        "vendor_id": vendor['id'],
-        "customer_name": data.get('name'),
-        "amount": float(data.get('amount')),
-        "item_desc": data.get('desc'),
-        "status": data.get('status', 'paid')
-    }
-
-    res = supabase.table('receipts').insert(new_receipt).execute()
-    if res.data:
-        return jsonify({"status": "success"})
-    return jsonify({"error": "Failed to save receipt"}), 500
+    try:
+        data = request.json
+        new_receipt = {
+            "vendor_id": vendor['id'],
+            "customer_name": data.get('name'),
+            "amount": float(data.get('amount')),
+            "item_desc": data.get('desc'),
+            "status": data.get('status', 'paid')
+        }
+        res = supabase.table('receipts').insert(new_receipt).execute()
+        if res.data:
+            return jsonify({"status": "success"})
+        return jsonify({"error": "Failed to save receipt"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/mark-paid/<int:receipt_id>', methods=['POST'])
@@ -180,8 +216,11 @@ def mark_paid(receipt_id):
     if not vendor:
         return jsonify({"error": "Unauthorized"}), 401
 
-    supabase.table('receipts').update({'status': 'paid'}).eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
-    return jsonify({"status": "success"})
+    try:
+        supabase.table('receipts').update({'status': 'paid'}).eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/receipt/<int:receipt_id>')
@@ -190,21 +229,24 @@ def get_receipt(receipt_id):
     if not vendor:
         return jsonify({"error": "Unauthorized"}), 401
 
-    res = supabase.table('receipts').select('*').eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
-    if res.data:
-        r = res.data[0]
-        return jsonify({
-            "id": r['id'],
-            "name": r['customer_name'],
-            "amount": float(r['amount']),
-            "desc": r['item_desc'],
-            "status": r['status'],
-            "date": r['date'][:10],
-            "business_name": vendor['business_name'],
-            "phone": vendor['phone'],
-            "ig_handle": vendor['ig_handle'],
-            "bank_details": vendor['bank_details']
-        })
+    try:
+        res = supabase.table('receipts').select('*').eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
+        if res.data:
+            r = res.data[0]
+            return jsonify({
+                "id": r['id'],
+                "name": r['customer_name'],
+                "amount": float(r['amount']),
+                "desc": r['item_desc'],
+                "status": r['status'],
+                "date": r['date'][:10],
+                "business_name": vendor['business_name'],
+                "phone": vendor.get('phone', ''),
+                "ig_handle": vendor.get('ig_handle', ''),
+                "bank_details": vendor.get('bank_details', '')
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
     return jsonify({"error": "Not found"}), 404
 
 
