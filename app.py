@@ -286,6 +286,9 @@ def download_pdf(receipt_id):
     doc.build(story)
     return send_file(pdf_path, as_attachment=True)
 
+@app.route('/ping')
+def ping():
+    return "OK", 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
