@@ -7,8 +7,8 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#047857">
-    <link rel="icon" type="image/png" href="/static/icon.png">
-    <link rel="apple-touch-icon" href="/static/icon.png">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="apple-touch-icon" href="/icon.png">
     <title>VendorDesk</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-30deg);
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 900;
             color: rgba(4, 120, 87, 0.08);
             white-space: nowrap;
@@ -35,12 +35,12 @@
     <div class="min-h-screen flex items-center justify-center p-4 bg-emerald-900/90 backdrop-blur-md">
         <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl">
             <div class="text-center mb-6">
-                <img src="/static/icon.png" class="w-16 h-16 mx-auto mb-2 rounded-2xl shadow-md" alt="VendorDesk Icon">
+                <img src="/icon.png" class="w-16 h-16 mx-auto mb-2 rounded-2xl shadow-md border border-emerald-100" alt="VendorDesk Icon" onerror="this.style.display='none'">
                 <h2 class="text-2xl font-black text-emerald-800">VendorDesk.</h2>
                 <p class="text-xs text-gray-500 font-medium">Manage your sales, receipts & business like a Boss.</p>
             </div>
 
-            <!-- Toggle Buttons -->
+            <!-- Auth Tabs -->
             <div class="flex bg-gray-100 p-1 rounded-xl mb-6">
                 <button id="tab-login" onclick="switchAuthTab('login')" class="w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white transition-all">Login</button>
                 <button id="tab-signup" onclick="switchAuthTab('signup')" class="w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg transition-all">Register</button>
@@ -56,7 +56,7 @@
                     <label class="block text-xs font-semibold text-gray-500 mb-1">Password</label>
                     <input type="password" id="login-password" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
                 </div>
-                <button type="submit" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl shadow-md hover:bg-emerald-800 transition-all">Login to Dashboard</button>
+                <button type="submit" id="login-btn" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl shadow-md hover:bg-emerald-800 transition-all">Login to Dashboard</button>
             </form>
 
             <!-- Register Form -->
@@ -87,9 +87,10 @@
                     <label class="block text-xs font-semibold text-gray-500 mb-1">Bank Details (Optional)</label>
                     <input type="text" id="reg-bank" placeholder="GTBank • 0123456789 • Business Name" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none">
                 </div>
-                <button type="submit" class="w-full bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-xl shadow-md hover:bg-emerald-800 transition-all mt-2">Create Account</button>
+                <button type="submit" id="reg-btn" class="w-full bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-xl shadow-md hover:bg-emerald-800 transition-all mt-2">Create Account</button>
             </form>
-            <p id="auth-error" class="text-xs text-red-500 text-center font-bold mt-3 hidden"></p>
+            
+            <p id="auth-error" class="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-bold mt-4 hidden"></p>
         </div>
     </div>
 {% else %}
@@ -99,7 +100,7 @@
         <header class="bg-emerald-700 text-white p-6 rounded-b-[2rem] shadow-md">
             <div class="flex justify-between items-center mb-2">
                 <div class="flex items-center space-x-3">
-                    <img src="/static/icon.png" class="w-10 h-10 rounded-xl border border-emerald-500 shadow-sm" alt="App Icon">
+                    <img src="/icon.png" class="w-10 h-10 rounded-xl border border-emerald-500 shadow-sm" alt="App Icon">
                     <div>
                         <h1 class="text-lg font-extrabold leading-tight">{{ vendor.business_name }}</h1>
                         <p class="text-[11px] text-emerald-200 font-medium">VendorDesk Verified</p>
@@ -232,10 +233,7 @@
     <!-- WATERMARKED RECEIPT PREVIEW MODAL -->
     <div id="receipt-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative">
-            
-            <!-- Target Box for Image Download -->
             <div id="receipt-card-content" class="bg-emerald-50/30 border border-emerald-100 rounded-2xl p-5 relative overflow-hidden">
-                <!-- Watermark Text -->
                 <div class="watermark-text" id="modal-watermark">VERIFIED • BRAND</div>
 
                 <div class="text-center pb-3 border-b border-gray-200 relative z-10">
@@ -268,13 +266,11 @@
                 </div>
             </div>
 
-            <!-- Action Buttons -->
             <div class="space-y-2 pt-4">
                 <button id="mark-paid-btn" onclick="markAsPaid()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-3 rounded-xl shadow-md hidden">
                     ⚡ Mark as Paid (Update Revenue)
                 </button>
                 <button onclick="downloadAsImage()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-3 rounded-xl shadow-md flex justify-center items-center space-x-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     <span>Download Image (PNG)</span>
                 </button>
                 <button onclick="shareWhatsApp()" class="w-full bg-[#25D366] text-white font-bold text-xs py-3 rounded-xl shadow-md flex justify-center items-center space-x-2">
@@ -337,6 +333,12 @@
 
         function handleLogin(e) {
             e.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const err = document.getElementById('auth-error');
+            err.classList.add('hidden');
+            btn.innerText = 'Logging in...';
+            btn.disabled = true;
+
             const formData = new FormData();
             formData.append('email', document.getElementById('login-email').value);
             formData.append('password', document.getElementById('login-password').value);
@@ -344,17 +346,31 @@
             fetch('/login', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') window.location.reload();
-                else {
-                    const err = document.getElementById('auth-error');
-                    err.innerText = data.error;
+                btn.innerText = 'Login to Dashboard';
+                btn.disabled = false;
+                if (data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    err.innerText = data.error || 'Failed to login';
                     err.classList.remove('hidden');
                 }
+            })
+            .catch(error => {
+                btn.innerText = 'Login to Dashboard';
+                btn.disabled = false;
+                err.innerText = 'Network error. Please try again.';
+                err.classList.remove('hidden');
             });
         }
 
         function handleRegister(e) {
             e.preventDefault();
+            const btn = document.getElementById('reg-btn');
+            const err = document.getElementById('auth-error');
+            err.classList.add('hidden');
+            btn.innerText = 'Creating Account...';
+            btn.disabled = true;
+
             const formData = new FormData();
             formData.append('business_name', document.getElementById('reg-name').value);
             formData.append('email', document.getElementById('reg-email').value);
@@ -366,12 +382,20 @@
             fetch('/register', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') window.location.reload();
-                else {
-                    const err = document.getElementById('auth-error');
-                    err.innerText = data.error;
+                btn.innerText = 'Create Account';
+                btn.disabled = false;
+                if (data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    err.innerText = data.error || 'Failed to create account';
                     err.classList.remove('hidden');
                 }
+            })
+            .catch(error => {
+                btn.innerText = 'Create Account';
+                btn.disabled = false;
+                err.innerText = 'Connection error. Please check your Render environment variables or Supabase tables.';
+                err.classList.remove('hidden');
             });
         }
 
