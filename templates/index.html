@@ -3,522 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- PWA Settings & Launcher Icon -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#047857">
     <link rel="icon" type="image/png" href="/icon.png">
-    <link rel="apple-touch-icon" href="/icon.png">
-    <title>VendorDesk</title>
     <link rel="manifest" href="/static/manifest.json">
-
+    <title>VendorDesk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        .watermark-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%) rotate(-30deg);
-            font-size: 1.1rem;
-            font-weight: 900;
-            color: rgba(4, 120, 87, 0.08);
-            white-space: nowrap;
-            pointer-events: none;
-            text-transform: uppercase;
-        }
+        .watermark-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 1.1rem; font-weight: 900; color: rgba(4, 120, 87, 0.08); pointer-events: none; text-transform: uppercase; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        input[type="checkbox"].toggle { appearance: none; width: 40px; height: 20px; background: #e5e7eb; border-radius: 20px; position: relative; cursor: pointer; outline: none; transition: background 0.3s; }
+        input[type="checkbox"].toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.3s; }
+        input[type="checkbox"].toggle:checked { background: #047857; }
+        input[type="checkbox"].toggle:checked::after { transform: translateX(20px); }
     </style>
 </head>
-<body class="bg-gray-100 font-sans text-gray-800 antialiased select-none">
+<body class="bg-gray-100 font-sans text-gray-800 antialiased pb-20 select-none">
 
 {% if not vendor %}
-    <!-- AUTH MODAL (LOGIN / SIGNUP) -->
-    <div class="min-h-screen flex items-center justify-center p-4 bg-emerald-900/90 backdrop-blur-md">
-        <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl">
-            <div class="text-center mb-6">
-                <img src="/icon.png" class="w-16 h-16 mx-auto mb-2 rounded-2xl shadow-md border border-emerald-100" alt="VendorDesk Icon" onerror="this.style.display='none'">
-                <h2 class="text-2xl font-black text-emerald-800">VendorDesk.</h2>
-                <p class="text-xs text-gray-500 font-medium">Manage your sales, receipts & business like a Boss.</p>
-            </div>
-
-            <!-- Auth Tabs -->
-            <div class="flex bg-gray-100 p-1 rounded-xl mb-6">
-                <button id="tab-login" onclick="switchAuthTab('login')" class="w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white transition-all">Login</button>
-                <button id="tab-signup" onclick="switchAuthTab('signup')" class="w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg transition-all">Register</button>
-            </div>
-
-            <!-- Login Form -->
-            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Email Address</label>
-                    <input type="email" id="login-email" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Password</label>
-                    <input type="password" id="login-password" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <button type="submit" id="login-btn" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl shadow-md hover:bg-emerald-800 transition-all">Login to Dashboard</button>
+    <!-- AUTHENTICATION (Unchanged) -->
+    <div class="min-h-screen flex items-center justify-center p-4 bg-emerald-900/90">
+        <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl text-center">
+            <img src="/icon.png" class="w-16 h-16 mx-auto mb-2 rounded-2xl shadow-md border border-emerald-100" onerror="this.style.display='none'">
+            <h2 class="text-2xl font-black text-emerald-800 mb-6">VendorDesk.</h2>
+            <form onsubmit="handleLogin(event)" id="login-form" class="space-y-4">
+                <input type="email" id="l-email" placeholder="Email" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm outline-none">
+                <input type="password" id="l-pass" placeholder="Password" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm outline-none">
+                <button type="submit" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl">Login to Dashboard</button>
             </form>
-
-            <!-- Register Form -->
-            <form id="signup-form" onsubmit="handleRegister(event)" class="space-y-3 hidden">
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Business Name</label>
-                    <input type="text" id="reg-name" placeholder="e.g. Adeeja's Cleaning Hub" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Email Address</label>
-                    <input type="email" id="reg-email" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Password</label>
-                    <input type="password" id="reg-password" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">Phone Number</label>
-                        <input type="text" id="reg-phone" placeholder="08012345678" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1">IG Handle</label>
-                        <input type="text" id="reg-ig" placeholder="@yourbrand" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-500 mb-1">Bank Details (Optional)</label>
-                    <input type="text" id="reg-bank" placeholder="GTBank • 0123456789 • Business Name" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none">
-                </div>
-                <button type="submit" id="reg-btn" class="w-full bg-emerald-700 text-white font-bold text-sm py-3.5 rounded-xl shadow-md hover:bg-emerald-800 transition-all mt-2">Create Account</button>
-            </form>
-            
-            <p id="auth-error" class="text-xs text-red-600 bg-red-50 border border-red-200 p-3 rounded-xl text-center font-bold mt-4 hidden"></p>
         </div>
     </div>
 {% else %}
 
-    <!-- MAIN VENDOR DASHBOARD -->
-    <div class="max-w-md mx-auto bg-gray-50 min-h-screen shadow-md pb-12">
-        <header class="bg-emerald-700 text-white p-6 rounded-b-[2rem] shadow-md">
-            <div class="flex justify-between items-center mb-2">
-                <div class="flex items-center space-x-3">
-                    <img src="/icon.png" class="w-10 h-10 rounded-xl border border-emerald-500 shadow-sm" alt="App Icon">
-                    <div>
-                        <h1 class="text-lg font-extrabold leading-tight">{{ vendor.business_name }}</h1>
-                        <p class="text-[11px] text-emerald-200 font-medium">VendorDesk Verified</p>
-                    </div>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <button onclick="openProfileModal()" class="bg-emerald-600/80 p-2 rounded-xl text-xs hover:bg-emerald-600 transition-all">⚙️</button>
-                    <a href="/logout" class="bg-emerald-800/80 p-2 rounded-xl text-xs hover:bg-red-600 transition-all">🚪</a>
+    <!-- HEADER -->
+    <header class="bg-emerald-700 text-white p-6 rounded-b-[2rem] shadow-md sticky top-0 z-40">
+        <div class="flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <img src="/icon.png" class="w-10 h-10 rounded-xl border border-emerald-500">
+                <div>
+                    <h1 class="text-lg font-extrabold leading-tight">{{ vendor.business_name }}</h1>
+                    <p class="text-[11px] text-emerald-200 font-medium">Verified Vendor</p>
                 </div>
             </div>
-        </header>
+            <button onclick="document.getElementById('settings-modal').classList.remove('hidden')" class="bg-emerald-800 p-2 rounded-xl text-xs">⚙️</button>
+        </div>
+    </header>
 
-        <main class="px-5 -mt-4 relative z-10">
-            <!-- CALENDAR DATE RANGE FILTER -->
-            <div class="bg-white p-3 rounded-2xl shadow-sm mb-4 border border-gray-100 flex flex-col space-y-2">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-bold text-gray-500">Timeframe:</span>
-                    <select id="time-filter" onchange="toggleCustomDate()" class="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 outline-none">
-                        <option value="all" {% if current_filter == 'all' %}selected{% endif %}>All Time (Since Joined)</option>
-                        <option value="today" {% if current_filter == 'today' %}selected{% endif %}>Today</option>
-                        <option value="week" {% if current_filter == 'week' %}selected{% endif %}>Last 7 Days</option>
-                        <option value="month" {% if current_filter == 'month' %}selected{% endif %}>This Month</option>
-                        <option value="year" {% if current_filter == 'year' %}selected{% endif %}>This Year</option>
-                        <option value="custom" {% if current_filter == 'custom' %}selected{% endif %}>Custom Date Range</option>
-                    </select>
-                </div>
-
-                <!-- Custom Range Inputs -->
-                <div id="custom-date-container" class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 {% if current_filter != 'custom' %}hidden{% endif %}">
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-bold mb-1">Start Date</label>
-                        <input type="date" id="start-date" value="{{ start_date or '' }}" class="w-full bg-gray-50 text-xs p-2 rounded-lg border border-gray-200">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] text-gray-400 font-bold mb-1">End Date</label>
-                        <input type="date" id="end-date" value="{{ end_date or '' }}" class="w-full bg-gray-50 text-xs p-2 rounded-lg border border-gray-200">
-                    </div>
-                    <button onclick="applyFilter()" class="col-span-2 bg-emerald-700 text-white font-bold text-xs py-2 rounded-lg mt-1">Apply Date Filter</button>
-                </div>
-            </div>
-
-            <!-- REVENUE & INVOICE STATS -->
-            <div class="grid grid-cols-2 gap-4 mb-6">
+    <main class="px-5 mt-4">
+        <!-- TAB 1: DASHBOARD & RECEIPTS -->
+        <div id="tab-dashboard" class="tab-content active">
+            <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
-                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Total Revenue</p>
-                    <p class="text-xl font-black text-emerald-800">₦{{ "{:,.0f}".format(revenue) }}</p>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Total Revenue</p>
+                    <p class="text-lg font-black text-gray-900" id="ui-revenue" data-val="{{ revenue }}">₦{{ "{:,.0f}".format(revenue) }}</p>
                 </div>
                 <div class="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
-                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Invoices Sent</p>
-                    <p class="text-xl font-black text-gray-900">{{ invoices }}</p>
+                    <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Invoices Sent</p>
+                    <p class="text-lg font-black text-emerald-700" id="ui-invoices">{{ invoices }}</p>
                 </div>
             </div>
 
-            <!-- CREATE RECEIPT FORM -->
-            <div class="bg-white border border-gray-100 p-5 rounded-3xl shadow-sm mb-8">
-                <h2 class="text-sm font-bold text-gray-800 mb-4 flex items-center">
-                    <span class="bg-emerald-500 w-2.5 h-2.5 rounded-full mr-2"></span>
-                    Issue New Receipt
-                </h2>
-                
-                <form id="receipt-form" onsubmit="handleCreateReceipt(event)" class="space-y-3.5">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Customer Name</label>
-                        <input type="text" id="customer-name" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
+            <div class="bg-white border p-5 rounded-3xl shadow-sm mb-6">
+                <h2 class="text-sm font-bold text-gray-800 mb-4">Issue New Receipt</h2>
+                <form onsubmit="addReceipt(event)" class="space-y-3.5">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="rec-name" placeholder="Customer Name" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
+                        <input type="text" id="rec-phone" placeholder="Phone (Optional)" class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Amount (₦)</label>
-                            <input type="number" id="amount" required class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Payment Status</label>
-                            <select id="receipt-status" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-3 py-3 font-bold text-gray-700 outline-none">
-                                <option value="paid">Paid (Complete)</option>
-                                <option value="pending">Pending (Owing)</option>
-                            </select>
-                        </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" id="rec-amount" placeholder="Amount (₦)" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
+                        <select id="rec-status" class="w-full bg-gray-50 border p-3 rounded-xl text-sm font-bold text-gray-700">
+                            <option value="paid">Paid</option>
+                            <option value="pending">Pending</option>
+                        </select>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 mb-1 ml-1">Item Description</label>
-                        <input type="text" id="item-desc" required placeholder="e.g. Leather Shoe Cleaning & Polish" class="w-full bg-gray-50 border border-gray-200 text-sm rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="rec-desc" placeholder="Item Description" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
+                        {% if vendor.use_inventory %}
+                        <select id="rec-inv" class="w-full bg-gray-50 border p-3 rounded-xl text-sm text-gray-600">
+                            <option value="">No Stock Deduction</option>
+                            {% for item in inventory %}
+                                <option value="{{ item.id }}">{{ item.item_name }}</option>
+                            {% endfor %}
+                        </select>
+                        {% else %}
+                        <input type="hidden" id="rec-inv" value="">
+                        {% endif %}
                     </div>
-                    <button type="submit" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-sm py-4 rounded-xl shadow-md transition-all">
-                        Generate Official Receipt
-                    </button>
+                    <button type="submit" id="btn-add-rec" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl">Generate Receipt</button>
                 </form>
             </div>
 
-            <!-- RECENT RECEIPTS FEED -->
-            <div>
-                <div class="mb-3">
-                    <input type="text" id="search-bar" onkeyup="searchReceipts()" placeholder="🔍 Search customer name..." class="w-full bg-white border border-gray-200 text-xs rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 shadow-sm outline-none">
-                </div>
-
-                <div class="flex justify-between items-center mb-3 px-1">
-                    <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider">Receipt Ledger</h2>
-                </div>
-                
-                <div class="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
-                    <ul class="divide-y divide-gray-50" id="receipt-list">
-                        {% for r in receipts %}
-                        <li onclick="openReceipt('{{ r.id }}')" class="receipt-item p-4 flex justify-between items-center hover:bg-emerald-50/50 cursor-pointer transition-colors" data-name="{{ r.customer_name }}">
-                            <div class="flex items-center space-x-3">
-                                <div class="bg-emerald-100 text-emerald-800 font-bold w-10 h-10 rounded-full flex items-center justify-center text-xs uppercase">
-                                    {{ r.customer_name[:2] }}
-                                </div>
-                                <div>
-                                    <p class="text-sm font-bold text-gray-800">{{ r.customer_name }}</p>
-                                    <p class="text-xs text-gray-400">{{ r.item_desc }}</p>
-                                </div>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-bold text-emerald-700">₦{{ "{:,.0f}".format(r.amount) }}</p>
-                                {% if r.status == 'pending' %}
-                                    <span class="bg-amber-100 text-amber-800 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Pending</span>
-                                {% else %}
-                                    <span class="bg-emerald-100 text-emerald-800 text-[9px] font-black px-2 py-0.5 rounded-full uppercase">Paid</span>
-                                {% endif %}
-                            </div>
-                        </li>
-                        {% else %}
-                        <li class="p-6 text-center text-xs text-gray-400">No receipts found for this timeframe.</li>
-                        {% endfor %}
-                    </ul>
-                </div>
+            <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Recent Sales</h2>
+            <div class="bg-white border rounded-2xl overflow-hidden mb-4">
+                <ul id="receipt-list" class="divide-y divide-gray-50">
+                    {% for r in receipts[:10] %}
+                    <li onclick="openReceipt('{{ r.id }}')" class="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer">
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">{{ r.customer_name }}</p>
+                            <p class="text-xs text-gray-400">{{ r.item_desc }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm font-bold text-emerald-700">₦{{ "{:,.0f}".format(r.amount) }}</p>
+                            {% if r.status == 'pending' %}<span class="text-[9px] font-black text-amber-600">PENDING</span>{% else %}<span class="text-[9px] font-black text-emerald-600">PAID</span>{% endif %}
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
             </div>
-        </main>
-    </div>
+        </div>
 
-    <!-- WATERMARKED RECEIPT PREVIEW MODAL -->
-    <div id="receipt-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl relative">
-            <div id="receipt-card-content" class="bg-emerald-50/30 border border-emerald-100 rounded-2xl p-5 relative overflow-hidden">
-                <div class="watermark-text" id="modal-watermark">VERIFIED • BRAND</div>
+        <!-- CONDITIONAL TABS -->
+        {% if vendor.use_inventory %}
+        <div id="tab-inventory" class="tab-content">
+            <h2 class="text-lg font-black text-emerald-800 mb-4">Stock Manager</h2>
+            <p class="text-xs text-gray-500 mb-4">You have enabled Inventory. Feature coming fully online soon.</p>
+        </div>
+        {% endif %}
 
-                <div class="text-center pb-3 border-b border-gray-200 relative z-10">
-                    <h3 id="modal-biz-name" class="font-extrabold text-emerald-900 text-base">BUSINESS NAME</h3>
-                    <p id="modal-biz-sub" class="text-[10px] text-gray-500">Phone & IG</p>
-                    <span id="modal-status-badge" class="inline-block mt-2 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 py-0.5 rounded-full uppercase">OFFICIAL INVOICE</span>
+        {% if vendor.use_expenses %}
+        <div id="tab-expenses" class="tab-content">
+            <h2 class="text-lg font-black text-emerald-800 mb-4">Expense Tracker</h2>
+            <p class="text-xs text-gray-500 mb-4">You have enabled Expenses. Feature coming fully online soon.</p>
+        </div>
+        {% endif %}
+
+        {% if vendor.use_crm %}
+        <div id="tab-crm" class="tab-content">
+            <h2 class="text-lg font-black text-emerald-800 mb-4">Customer Phonebook</h2>
+            <p class="text-xs text-gray-500 mb-4">You have enabled CRM. Feature coming fully online soon.</p>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- DYNAMIC BOTTOM NAVIGATION -->
+    <nav class="fixed bottom-0 w-full max-w-md bg-white border-t border-gray-200 flex justify-around pb-safe pt-2 px-2 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] z-40">
+        <button onclick="navTab('dashboard')" class="nav-btn text-emerald-700 flex flex-col items-center p-2" data-tab="dashboard">
+            <span class="text-xl mb-1">🏠</span><span class="text-[9px] font-bold">Home</span>
+        </button>
+        {% if vendor.use_inventory %}
+        <button onclick="navTab('inventory')" class="nav-btn text-gray-400 flex flex-col items-center p-2" data-tab="inventory">
+            <span class="text-xl mb-1">📦</span><span class="text-[9px] font-bold">Stock</span>
+        </button>
+        {% endif %}
+        {% if vendor.use_expenses %}
+        <button onclick="navTab('expenses')" class="nav-btn text-gray-400 flex flex-col items-center p-2" data-tab="expenses">
+            <span class="text-xl mb-1">💸</span><span class="text-[9px] font-bold">Expenses</span>
+        </button>
+        {% endif %}
+        {% if vendor.use_crm %}
+        <button onclick="navTab('crm')" class="nav-btn text-gray-400 flex flex-col items-center p-2" data-tab="crm">
+            <span class="text-xl mb-1">👥</span><span class="text-[9px] font-bold">CRM</span>
+        </button>
+        {% endif %}
+    </nav>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 relative">
+            <h3 class="font-black text-lg text-emerald-800 mb-4 border-b pb-2">Business Settings</h3>
+            <form onsubmit="saveSettings(event)" class="space-y-4">
+                <input type="text" id="set-biz" value="{{ vendor.business_name }}" class="w-full bg-gray-50 border p-3 rounded-xl text-sm font-bold" required>
+                <div class="space-y-3 py-2">
+                    <p class="text-xs font-bold text-gray-500 uppercase">App Features (ERP)</p>
+                    <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
+                        <span class="text-sm font-bold text-gray-700">📦 Enable Stock Manager</span>
+                        <input type="checkbox" id="set-inv" class="toggle" {% if vendor.use_inventory %}checked{% endif %}>
+                    </label>
+                    <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
+                        <span class="text-sm font-bold text-gray-700">💸 Enable Expenses Tracker</span>
+                        <input type="checkbox" id="set-exp" class="toggle" {% if vendor.use_expenses %}checked{% endif %}>
+                    </label>
+                    <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
+                        <span class="text-sm font-bold text-gray-700">👥 Enable Phonebook (CRM)</span>
+                        <input type="checkbox" id="set-crm" class="toggle" {% if vendor.use_crm %}checked{% endif %}>
+                    </label>
                 </div>
-
-                <div class="py-4 space-y-2.5 text-xs relative z-10">
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Customer:</span>
-                        <span id="modal-customer" class="font-bold text-gray-800">Name</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Item:</span>
-                        <span id="modal-desc" class="font-bold text-gray-800 text-right">Description</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Date:</span>
-                        <span id="modal-date" class="text-gray-600">2026-10-27</span>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-200 pt-3">
-                        <span class="text-gray-500 font-bold">Total Amount:</span>
-                        <span id="modal-amount" class="font-black text-emerald-700 text-base">₦0</span>
-                    </div>
-                    <div id="modal-bank-box" class="mt-3 bg-white p-2.5 rounded-xl border border-gray-100 text-[11px] text-gray-600 hidden">
-                        <span class="font-bold block text-gray-700 mb-0.5">Bank Payment Info:</span>
-                        <span id="modal-bank-text">GTBank • 0000000000</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="space-y-2 pt-4">
-                <button id="mark-paid-btn" onclick="markAsPaid()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-3 rounded-xl shadow-md hidden">
-                    ⚡ Mark as Paid (Update Revenue)
-                </button>
-                <button onclick="downloadAsImage()" class="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs py-3 rounded-xl shadow-md flex justify-center items-center space-x-2">
-                    <span>Download Image (PNG)</span>
-                </button>
-                <button onclick="shareWhatsApp()" class="w-full bg-[#25D366] text-white font-bold text-xs py-3 rounded-xl shadow-md flex justify-center items-center space-x-2">
-                    <span>Share Details on WhatsApp</span>
-                </button>
-                <a id="pdf-link" href="#" target="_blank" class="block text-center w-full bg-gray-800 text-white font-bold text-xs py-3 rounded-xl">
-                    Download Official PDF
-                </a>
-                <button onclick="closeModal()" class="w-full bg-gray-100 text-gray-600 font-bold text-xs py-2.5 rounded-xl">Close</button>
-            </div>
+                <button type="submit" id="btn-save-set" class="w-full bg-emerald-700 text-white font-bold text-sm py-3 rounded-xl">Save & Apply Changes</button>
+                <button type="button" onclick="document.getElementById('settings-modal').classList.add('hidden')" class="w-full bg-gray-100 text-gray-600 font-bold text-sm py-3 rounded-xl">Cancel</button>
+                <a href="/logout" class="block text-center w-full text-red-500 font-bold text-xs pt-2">Logout</a>
+            </form>
         </div>
     </div>
 
-    <!-- PROFILE SETTINGS MODAL -->
-    <div id="profile-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl">
-            <h3 class="font-bold text-base text-gray-800 mb-4">Edit Business Settings</h3>
-            <form onsubmit="handleUpdateProfile(event)" class="space-y-3 text-xs">
-                <div>
-                    <label class="block font-semibold text-gray-500 mb-1">Business Name</label>
-                    <input type="text" id="prof-biz" value="{{ vendor.business_name }}" required class="w-full bg-gray-50 border p-2.5 rounded-xl">
+    <!-- RECEIPT PREVIEW MODAL -->
+    <div id="receipt-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 relative">
+            <div id="receipt-card-content" class="bg-emerald-50 border border-emerald-100 p-5 rounded-xl text-center relative overflow-hidden mb-4">
+                <div class="watermark-text" id="modal-watermark">VERIFIED</div>
+                <h3 id="modal-biz" class="font-extrabold text-emerald-900 text-base">BIZ</h3>
+                <span class="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">OFFICIAL INVOICE</span>
+                <div class="text-xs mt-3 text-left space-y-1">
+                    <p><b>Name:</b> <span id="modal-name"></span></p>
+                    <p><b>Item:</b> <span id="modal-desc"></span></p>
+                    <p><b>Total:</b> <span id="modal-amt" class="text-emerald-700 font-black text-sm"></span></p>
                 </div>
-                <div>
-                    <label class="block font-semibold text-gray-500 mb-1">Phone Number</label>
-                    <input type="text" id="prof-phone" value="{{ vendor.phone or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl">
-                </div>
-                <div>
-                    <label class="block font-semibold text-gray-500 mb-1">Instagram Handle</label>
-                    <input type="text" id="prof-ig" value="{{ vendor.ig_handle or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl">
-                </div>
-                <div>
-                    <label class="block font-semibold text-gray-500 mb-1">Bank Details</label>
-                    <input type="text" id="prof-bank" value="{{ vendor.bank_details or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl">
-                </div>
-                <button type="submit" class="w-full bg-emerald-700 text-white font-bold py-3 rounded-xl mt-2">Save Settings</button>
-                <button type="button" onclick="closeProfileModal()" class="w-full bg-gray-100 text-gray-600 font-bold py-2.5 rounded-xl">Cancel</button>
-            </form>
+            </div>
+            <button onclick="downloadImg()" class="w-full bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl flex justify-center items-center gap-2 mb-2">📸 Save Image</button>
+            <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="w-full bg-gray-100 text-gray-600 font-bold text-xs py-3 rounded-xl">Close</button>
         </div>
     </div>
 
 {% endif %}
 
-    <script>
-        let currentReceiptData = null;
+<script>
+    function handleLogin(e) {
+        e.preventDefault();
+        const fd = new FormData();
+        fd.append('email', document.getElementById('l-email').value);
+        fd.append('password', document.getElementById('l-pass').value);
+        fetch('/login', { method: 'POST', body: fd }).then(() => window.location.reload());
+    }
 
-        function switchAuthTab(tab) {
-            document.getElementById('auth-error').classList.add('hidden');
-            if (tab === 'login') {
-                document.getElementById('login-form').classList.remove('hidden');
-                document.getElementById('signup-form').classList.add('hidden');
-                document.getElementById('tab-login').className = "w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white transition-all";
-                document.getElementById('tab-signup').className = "w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg transition-all";
-            } else {
-                document.getElementById('login-form').classList.add('hidden');
-                document.getElementById('signup-form').classList.remove('hidden');
-                document.getElementById('tab-signup').className = "w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white transition-all";
-                document.getElementById('tab-login').className = "w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg transition-all";
+    function navTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        document.querySelectorAll('.nav-btn').forEach(el => { el.classList.remove('text-emerald-700'); el.classList.add('text-gray-400'); });
+        document.querySelector(`[data-tab="${tabId}"]`).classList.add('text-emerald-700');
+        document.querySelector(`[data-tab="${tabId}"]`).classList.remove('text-gray-400');
+    }
+
+    // SILENT UI UPDATE: No reloading!
+    function addReceipt(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-add-rec');
+        btn.innerText = 'Saving...';
+        
+        const name = document.getElementById('rec-name').value;
+        const amount = parseFloat(document.getElementById('rec-amount').value);
+        const desc = document.getElementById('rec-desc').value;
+        const status = document.getElementById('rec-status').value;
+
+        fetch('/add-receipt', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, phone: document.getElementById('rec-phone').value, amount: amount, status: status, desc: desc, inventory_id: document.getElementById('rec-inv').value })
+        }).then(res => res.json()).then(data => {
+            if(data.status === 'success') {
+                // Instantly update Revenue if paid
+                if(status === 'paid') {
+                    let revEl = document.getElementById('ui-revenue');
+                    let newRev = parseFloat(revEl.getAttribute('data-val')) + amount;
+                    revEl.setAttribute('data-val', newRev);
+                    revEl.innerText = '₦' + newRev.toLocaleString();
+                }
+                
+                // Instantly inject new receipt at top of list
+                const list = document.getElementById('receipt-list');
+                const badge = status === 'pending' ? `<span class="text-[9px] font-black text-amber-600">PENDING</span>` : `<span class="text-[9px] font-black text-emerald-600">PAID</span>`;
+                const li = `<li onclick="openReceipt('${data.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer animate-pulse">
+                                <div><p class="text-sm font-bold text-gray-800">${name}</p><p class="text-xs text-gray-400">${desc}</p></div>
+                                <div class="text-right"><p class="text-sm font-bold text-emerald-700">₦${amount.toLocaleString()}</p>${badge}</div>
+                            </li>`;
+                list.insertAdjacentHTML('afterbegin', li);
+                
+                // Update Invoice Count
+                let countEl = document.getElementById('ui-invoices');
+                countEl.innerText = parseInt(countEl.innerText) + 1;
+
+                // Reset Form
+                e.target.reset();
+                btn.innerText = 'Generate Receipt';
             }
-        }
+        });
+    }
 
-        function handleLogin(e) {
-            e.preventDefault();
-            const btn = document.getElementById('login-btn');
-            const err = document.getElementById('auth-error');
-            err.classList.add('hidden');
-            btn.innerText = 'Logging in...';
-            btn.disabled = true;
-
-            const formData = new FormData();
-            formData.append('email', document.getElementById('login-email').value);
-            formData.append('password', document.getElementById('login-password').value);
-
-            fetch('/login', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                btn.innerText = 'Login to Dashboard';
-                btn.disabled = false;
-                if (data.status === 'success') {
-                    window.location.reload();
-                } else {
-                    err.innerText = data.error || 'Failed to login';
-                    err.classList.remove('hidden');
-                }
+    function saveSettings(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save-set');
+        btn.innerText = 'Applying...';
+        fetch('/update-profile', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                business_name: document.getElementById('set-biz').value,
+                use_inventory: document.getElementById('set-inv').checked,
+                use_expenses: document.getElementById('set-exp').checked,
+                use_crm: document.getElementById('set-crm').checked
             })
-            .catch(error => {
-                btn.innerText = 'Login to Dashboard';
-                btn.disabled = false;
-                err.innerText = 'Network error. Please try again.';
-                err.classList.remove('hidden');
-            });
-        }
+        }).then(() => window.location.reload()); // Only reload when turning whole features on/off
+    }
 
-        function handleRegister(e) {
-            e.preventDefault();
-            const btn = document.getElementById('reg-btn');
-            const err = document.getElementById('auth-error');
-            err.classList.add('hidden');
-            btn.innerText = 'Creating Account...';
-            btn.disabled = true;
+    let curRec = null;
+    function openReceipt(id) {
+        fetch('/receipt/' + id).then(r => r.json()).then(d => {
+            curRec = d;
+            document.getElementById('modal-biz').innerText = d.business_name.toUpperCase();
+            document.getElementById('modal-name').innerText = d.name;
+            document.getElementById('modal-desc').innerText = d.desc;
+            document.getElementById('modal-amt').innerText = '₦' + d.amount.toLocaleString();
+            document.getElementById('receipt-modal').classList.remove('hidden');
+        });
+    }
 
-            const formData = new FormData();
-            formData.append('business_name', document.getElementById('reg-name').value);
-            formData.append('email', document.getElementById('reg-email').value);
-            formData.append('password', document.getElementById('reg-password').value);
-            formData.append('phone', document.getElementById('reg-phone').value);
-            formData.append('ig_handle', document.getElementById('reg-ig').value);
-            formData.append('bank_details', document.getElementById('reg-bank').value);
-
-            fetch('/register', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                btn.innerText = 'Create Account';
-                btn.disabled = false;
-                if (data.status === 'success') {
-                    window.location.reload();
-                } else {
-                    err.innerText = data.error || 'Failed to create account';
-                    err.classList.remove('hidden');
-                }
-            })
-            .catch(error => {
-                btn.innerText = 'Create Account';
-                btn.disabled = false;
-                err.innerText = 'Connection error. Please check your Render environment variables or Supabase tables.';
-                err.classList.remove('hidden');
-            });
-        }
-
-        function toggleCustomDate() {
-            const filter = document.getElementById('time-filter').value;
-            const container = document.getElementById('custom-date-container');
-            if (filter === 'custom') {
-                container.classList.remove('hidden');
-            } else {
-                container.classList.add('hidden');
-                window.location.href = '/?filter=' + filter;
-            }
-        }
-
-        function applyFilter() {
-            const start = document.getElementById('start-date').value;
-            const end = document.getElementById('end-date').value;
-            if (!start || !end) return alert('Please select both Start and End dates.');
-            window.location.href = `/?filter=custom&start_date=${start}&end_date=${end}`;
-        }
-
-        function handleCreateReceipt(e) {
-            e.preventDefault();
-            fetch('/add-receipt', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: document.getElementById('customer-name').value,
-                    amount: document.getElementById('amount').value,
-                    desc: document.getElementById('item-desc').value,
-                    status: document.getElementById('receipt-status').value
-                })
-            }).then(() => window.location.reload());
-        }
-
-        function openReceipt(id) {
-            fetch('/receipt/' + id)
-            .then(res => res.json())
-            .then(data => {
-                currentReceiptData = data;
-                document.getElementById('modal-biz-name').innerText = data.business_name.toUpperCase();
-                document.getElementById('modal-biz-sub').innerText = `${data.phone || ''} • ${data.ig_handle || ''}`;
-                document.getElementById('modal-watermark').innerText = `VERIFIED • ${data.business_name.toUpperCase()}`;
-                document.getElementById('modal-customer').innerText = data.name;
-                document.getElementById('modal-desc').innerText = data.desc;
-                document.getElementById('modal-amount').innerText = '₦' + data.amount.toLocaleString();
-                document.getElementById('modal-date').innerText = data.date;
-                document.getElementById('pdf-link').href = '/download-pdf/' + data.id;
-
-                if (data.bank_details) {
-                    document.getElementById('modal-bank-text').innerText = data.bank_details;
-                    document.getElementById('modal-bank-box').classList.remove('hidden');
-                } else {
-                    document.getElementById('modal-bank-box').classList.add('hidden');
-                }
-
-                const markBtn = document.getElementById('mark-paid-btn');
-                if (data.status === 'pending') {
-                    markBtn.classList.remove('hidden');
-                    document.getElementById('modal-status-badge').className = "inline-block mt-2 bg-amber-100 text-amber-800 text-[10px] font-bold px-3 py-0.5 rounded-full uppercase";
-                    document.getElementById('modal-status-badge').innerText = "PENDING INVOICE";
-                } else {
-                    markBtn.classList.add('hidden');
-                    document.getElementById('modal-status-badge').className = "inline-block mt-2 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-3 py-0.5 rounded-full uppercase";
-                    document.getElementById('modal-status-badge').innerText = "OFFICIAL RECEIPT (PAID)";
-                }
-
-                document.getElementById('receipt-modal').classList.remove('hidden');
-            });
-        }
-
-        function markAsPaid() {
-            if (!currentReceiptData) return;
-            fetch('/mark-paid/' + currentReceiptData.id, { method: 'POST' })
-            .then(() => window.location.reload());
-        }
-
-        function downloadAsImage() {
-            const card = document.getElementById('receipt-card-content');
-            html2canvas(card, { scale: 3 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Receipt_${currentReceiptData.name}_${currentReceiptData.id}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            });
-        }
-
-        function shareWhatsApp() {
-            if (!currentReceiptData) return;
-            const text = `Hello ${currentReceiptData.name},%0A%0AHere are your receipt details from *${currentReceiptData.business_name}*:%0A%0A*Item:* ${currentReceiptData.desc}%0A*Amount:* ₦${currentReceiptData.amount.toLocaleString()}%0A*Status:* ${currentReceiptData.status.toUpperCase()}%0A*Date:* ${currentReceiptData.date}%0A%0AThank you for your business!`;
-            window.open(`https://wa.me/?text=${text}`, '_blank');
-        }
-
-        function searchReceipts() {
-            const q = document.getElementById('search-bar').value.toLowerCase();
-            document.querySelectorAll('.receipt-item').forEach(el => {
-                const name = el.getAttribute('data-name').toLowerCase();
-                el.style.display = name.includes(q) ? 'flex' : 'none';
-            });
-        }
-
-        function closeModal() { document.getElementById('receipt-modal').classList.add('hidden'); }
-        function openProfileModal() { document.getElementById('profile-modal').classList.remove('hidden'); }
-        function closeProfileModal() { document.getElementById('profile-modal').classList.add('hidden'); }
-
-        function handleUpdateProfile(e) {
-            e.preventDefault();
-            fetch('/update-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    business_name: document.getElementById('prof-biz').value,
-                    phone: document.getElementById('prof-phone').value,
-                    ig_handle: document.getElementById('prof-ig').value,
-                    bank_details: document.getElementById('prof-bank').value
-                })
-            }).then(() => window.location.reload());
-        }
-        if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/static/sw.js');
-}
-
-    </script>
+    function downloadImg() {
+        html2canvas(document.getElementById('receipt-card-content'), { scale: 3 }).then(canvas => {
+            let a = document.createElement('a');
+            a.download = `Receipt_${curRec.name}.png`;
+            a.href = canvas.toDataURL();
+            a.click();
+        });
+    }
+</script>
 </body>
 </html>
