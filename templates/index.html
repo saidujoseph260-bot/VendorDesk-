@@ -72,6 +72,34 @@
     <main class="px-5 mt-4">
         <!-- TAB 1: DASHBOARD -->
         <div id="tab-dashboard" class="tab-content active">
+            
+            <!-- TIME FILTER ALLOCATION -->
+            <div class="bg-white p-3 rounded-2xl shadow-sm mb-4 border border-gray-100 flex flex-col space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-gray-500">Timeframe Filter:</span>
+                    <select id="time-filter" onchange="toggleCustomDate()" class="bg-gray-50 border border-gray-200 text-xs font-bold text-gray-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-emerald-500 outline-none">
+                        <option value="all" {% if current_filter == 'all' %}selected{% endif %}>All Time (Since Joined)</option>
+                        <option value="today" {% if current_filter == 'today' %}selected{% endif %}>Today</option>
+                        <option value="week" {% if current_filter == 'week' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="month" {% if current_filter == 'month' %}selected{% endif %}>This Month</option>
+                        <option value="year" {% if current_filter == 'year' %}selected{% endif %}>This Year</option>
+                        <option value="custom" {% if current_filter == 'custom' %}selected{% endif %}>Custom Date Range</option>
+                    </select>
+                </div>
+                <div id="custom-date-container" class="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 {% if current_filter != 'custom' %}hidden{% endif %}">
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1">Start Date</label>
+                        <input type="date" id="start-date" value="{{ start_date or '' }}" class="w-full bg-gray-50 text-xs p-2 rounded-lg border border-gray-200">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-400 font-bold mb-1">End Date</label>
+                        <input type="date" id="end-date" value="{{ end_date or '' }}" class="w-full bg-gray-50 text-xs p-2 rounded-lg border border-gray-200">
+                    </div>
+                    <button onclick="applyFilter()" class="col-span-2 bg-emerald-700 text-white font-bold text-xs py-2 rounded-lg mt-1">Apply Date Filter</button>
+                </div>
+            </div>
+
+            <!-- FINANCIALS -->
             <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
                     <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Total Revenue</p>
@@ -91,6 +119,7 @@
                 {% endif %}
             </div>
 
+            <!-- GENERATE RECEIPT -->
             <div class="bg-white border p-5 rounded-3xl shadow-sm mb-6">
                 <h2 class="text-sm font-bold text-gray-800 mb-4">Issue New Receipt</h2>
                 <form onsubmit="addReceipt(event)" class="space-y-3.5">
@@ -111,7 +140,7 @@
                         <select id="rec-inv" class="w-full bg-gray-50 border p-3 rounded-xl text-sm text-gray-600">
                             <option value="">No Stock Deduction</option>
                             {% for item in inventory %}
-                                <option value="{{ item.id }}">{{ item.item_name }}</option>
+                                <option value="{{ item.id }}">{{ item.item_name }} ({{ item.stock_quantity }} left)</option>
                             {% endfor %}
                         </select>
                         {% else %}
@@ -122,11 +151,15 @@
                 </form>
             </div>
 
+            <!-- RECENT SALES -->
+            <div class="mb-3">
+                <input type="text" id="search-bar" onkeyup="searchReceipts()" placeholder="🔍 Search customer name..." class="w-full bg-white border border-gray-200 text-xs rounded-xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 shadow-sm outline-none">
+            </div>
             <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Recent Sales</h2>
             <div class="bg-white border rounded-2xl overflow-hidden mb-4">
                 <ul id="receipt-list" class="divide-y divide-gray-50">
-                    {% for r in receipts[:10] %}
-                    <li onclick="openReceipt('{{ r.id }}')" class="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer">
+                    {% for r in receipts %}
+                    <li onclick="openReceipt('{{ r.id }}')" class="receipt-item p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer" data-name="{{ r.customer_name }}">
                         <div>
                             <p class="text-sm font-bold text-gray-800">{{ r.customer_name }}</p>
                             <p class="text-xs text-gray-400">{{ r.item_desc }}</p>
@@ -137,7 +170,7 @@
                         </div>
                     </li>
                     {% else %}
-                    <li class="p-4 text-center text-xs text-gray-400">No receipts yet.</li>
+                    <li class="p-4 text-center text-xs text-gray-400">No receipts found for this timeframe.</li>
                     {% endfor %}
                 </ul>
             </div>
@@ -286,6 +319,7 @@
             <div id="receipt-card-content" class="bg-emerald-50 border border-emerald-100 p-5 rounded-xl text-center relative overflow-hidden mb-4">
                 <div class="watermark-text" id="modal-watermark">VERIFIED</div>
                 <h3 id="modal-biz" class="font-extrabold text-emerald-900 text-base">BIZ</h3>
+                <p id="modal-biz-sub" class="text-[10px] text-gray-500 mb-1"></p>
                 <span id="modal-badge" class="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">OFFICIAL INVOICE</span>
                 <div class="text-xs mt-3 text-left space-y-1">
                     <p><b>Name:</b> <span id="modal-name"></span></p>
@@ -303,7 +337,7 @@
                 <button id="mark-paid-btn" onclick="markAsPaid()" class="w-full bg-amber-500 text-white font-bold text-xs py-3 rounded-xl hidden">⚡ Mark as Paid</button>
                 <button onclick="downloadImg()" class="w-full bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl">📸 Save Image (PNG)</button>
                 <button onclick="shareWhatsApp()" class="w-full bg-[#25D366] text-white font-bold text-xs py-3 rounded-xl">Share on WhatsApp</button>
-                <a id="pdf-link" href="#" target="_blank" class="block text-center w-full bg-gray-800 text-white font-bold text-xs py-3 rounded-xl">Download PDF</a>
+                <a id="pdf-link" href="#" target="_blank" class="block text-center w-full bg-gray-800 text-white font-bold text-xs py-3 rounded-xl">Download Official PDF</a>
                 <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="w-full bg-gray-100 text-gray-600 font-bold text-xs py-3 rounded-xl">Close</button>
             </div>
         </div>
@@ -312,6 +346,7 @@
 {% endif %}
 
 <script>
+    // Auth Toggles
     function switchAuth(tab) {
         document.getElementById('auth-error').classList.add('hidden');
         if (tab === 'login') {
@@ -327,6 +362,7 @@
         }
     }
 
+    // Login/Register Logic
     function handleLogin(e) {
         e.preventDefault();
         const fd = new FormData();
@@ -355,6 +391,7 @@
         });
     }
 
+    // Nav and Search
     function navTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.getElementById('tab-' + tabId).classList.add('active');
@@ -363,10 +400,38 @@
         document.querySelector(`[data-tab="${tabId}"]`).classList.remove('text-gray-400');
     }
 
+    function searchReceipts() {
+        const q = document.getElementById('search-bar').value.toLowerCase();
+        document.querySelectorAll('.receipt-item').forEach(el => {
+            const name = el.getAttribute('data-name').toLowerCase();
+            el.style.display = name.includes(q) ? 'flex' : 'none';
+        });
+    }
+
+    // Date Range Logic
+    function toggleCustomDate() {
+        const filter = document.getElementById('time-filter').value;
+        const container = document.getElementById('custom-date-container');
+        if (filter === 'custom') {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+            window.location.href = '/?filter=' + filter;
+        }
+    }
+    function applyFilter() {
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        if (!start || !end) return alert('Please select both Start and End dates.');
+        window.location.href = `/?filter=custom&start_date=${start}&end_date=${end}`;
+    }
+
+    // Save Receipt & Silent Update
     function addReceipt(e) {
         e.preventDefault();
         const btn = document.getElementById('btn-add-rec');
         btn.innerText = 'Saving...';
+        btn.disabled = true;
         
         const name = document.getElementById('rec-name').value;
         const amount = parseFloat(document.getElementById('rec-amount').value);
@@ -389,9 +454,9 @@
                     revEl.innerText = '₦' + newRev.toLocaleString();
                 }
                 const list = document.getElementById('receipt-list');
-                if(list.innerText.includes("No receipts yet")) list.innerHTML = "";
+                if(list.innerText.includes("No receipts found")) list.innerHTML = "";
                 const badge = status === 'pending' ? `<span class="text-[9px] font-black text-amber-600">PENDING</span>` : `<span class="text-[9px] font-black text-emerald-600">PAID</span>`;
-                const li = `<li onclick="openReceipt('${data.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer animate-pulse">
+                const li = `<li onclick="openReceipt('${data.id}')" class="receipt-item p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer animate-pulse" data-name="${name}">
                                 <div><p class="text-sm font-bold text-gray-800">${name}</p><p class="text-xs text-gray-400">${desc}</p></div>
                                 <div class="text-right"><p class="text-sm font-bold text-emerald-700">₦${amount.toLocaleString()}</p>${badge}</div>
                             </li>`;
@@ -402,30 +467,33 @@
 
                 e.target.reset();
                 btn.innerText = 'Generate Receipt';
+                btn.disabled = false;
             } else {
                 alert("Error saving: " + data.error);
                 btn.innerText = 'Generate Receipt';
+                btn.disabled = false;
             }
         }).catch(err => {
             alert("Network error.");
             btn.innerText = 'Generate Receipt';
+            btn.disabled = false;
         });
     }
 
+    // ERP Functions
     function addExpense(e) {
         e.preventDefault();
         fetch('/add-expense', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: document.getElementById('exp-desc').value, amount: document.getElementById('exp-amount').value }) }).then(() => window.location.reload());
     }
-
     function addInventory(e) {
         e.preventDefault();
         fetch('/add-inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_name: document.getElementById('inv-name').value, quantity: document.getElementById('inv-qty').value }) }).then(() => window.location.reload());
     }
-
     function updateQty(id, qty) {
         fetch('/update-inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, quantity: qty }) }).then(() => window.location.reload());
     }
 
+    // Save Settings
     function saveSettings(e) {
         e.preventDefault();
         const btn = document.getElementById('btn-save-set');
@@ -444,11 +512,14 @@
         }).then(() => window.location.reload());
     }
 
+    // Receipt Modal & Actions
     let curRec = null;
     function openReceipt(id) {
         fetch('/receipt/' + id).then(r => r.json()).then(d => {
             curRec = d;
             document.getElementById('modal-biz').innerText = d.business_name.toUpperCase();
+            document.getElementById('modal-biz-sub').innerText = `${d.phone} • ${d.ig_handle}`;
+            document.getElementById('modal-watermark').innerText = `VERIFIED • ${d.business_name.toUpperCase()}`;
             document.getElementById('modal-name').innerText = d.name;
             document.getElementById('modal-desc').innerText = d.desc;
             document.getElementById('modal-date').innerText = d.date;
