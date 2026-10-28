@@ -24,21 +24,38 @@
 <body class="bg-gray-100 font-sans text-gray-800 antialiased pb-20 select-none">
 
 {% if not vendor %}
-    <!-- AUTHENTICATION (Unchanged) -->
     <div class="min-h-screen flex items-center justify-center p-4 bg-emerald-900/90">
         <div class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl text-center">
             <img src="/icon.png" class="w-16 h-16 mx-auto mb-2 rounded-2xl shadow-md border border-emerald-100" onerror="this.style.display='none'">
             <h2 class="text-2xl font-black text-emerald-800 mb-6">VendorDesk.</h2>
+            
+            <div class="flex bg-gray-100 p-1 rounded-xl mb-6">
+                <button id="tab-login" onclick="switchAuth('login')" class="w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white transition-all">Login</button>
+                <button id="tab-signup" onclick="switchAuth('signup')" class="w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg transition-all">Register</button>
+            </div>
+
             <form onsubmit="handleLogin(event)" id="login-form" class="space-y-4">
                 <input type="email" id="l-email" placeholder="Email" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm outline-none">
                 <input type="password" id="l-pass" placeholder="Password" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm outline-none">
-                <button type="submit" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl">Login to Dashboard</button>
+                <button type="submit" id="btn-login" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl">Login to Dashboard</button>
             </form>
+
+            <form onsubmit="handleRegister(event)" id="signup-form" class="space-y-3 hidden">
+                <input type="text" id="r-biz" placeholder="Business Name" required class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                <input type="email" id="r-email" placeholder="Email Address" required class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                <input type="password" id="r-pass" placeholder="Password" required class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="r-phone" placeholder="Phone Number" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                    <input type="text" id="r-ig" placeholder="IG Handle" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                </div>
+                <input type="text" id="r-bank" placeholder="Bank Details (Optional)" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm outline-none">
+                <button type="submit" id="btn-reg" class="w-full bg-emerald-700 text-white font-bold text-sm py-4 rounded-xl">Create Account</button>
+            </form>
+            <p id="auth-error" class="text-xs text-red-600 font-bold mt-4 hidden"></p>
         </div>
     </div>
 {% else %}
 
-    <!-- HEADER -->
     <header class="bg-emerald-700 text-white p-6 rounded-b-[2rem] shadow-md sticky top-0 z-40">
         <div class="flex justify-between items-center">
             <div class="flex items-center space-x-3">
@@ -53,7 +70,7 @@
     </header>
 
     <main class="px-5 mt-4">
-        <!-- TAB 1: DASHBOARD & RECEIPTS -->
+        <!-- TAB 1: DASHBOARD -->
         <div id="tab-dashboard" class="tab-content active">
             <div class="grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-white border border-gray-100 p-4 rounded-2xl shadow-sm">
@@ -64,6 +81,14 @@
                     <p class="text-[10px] text-gray-400 font-bold uppercase mb-1">Invoices Sent</p>
                     <p class="text-lg font-black text-emerald-700" id="ui-invoices">{{ invoices }}</p>
                 </div>
+                {% if vendor.use_expenses %}
+                <div class="col-span-2 bg-emerald-700 text-white p-4 rounded-2xl shadow-sm flex justify-between items-center">
+                    <div>
+                        <p class="text-[10px] text-emerald-200 font-bold uppercase mb-1">Net Profit</p>
+                        <p class="text-2xl font-black">₦{{ "{:,.0f}".format(net_profit) }}</p>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <div class="bg-white border p-5 rounded-3xl shadow-sm mb-6">
@@ -111,30 +136,78 @@
                             {% if r.status == 'pending' %}<span class="text-[9px] font-black text-amber-600">PENDING</span>{% else %}<span class="text-[9px] font-black text-emerald-600">PAID</span>{% endif %}
                         </div>
                     </li>
+                    {% else %}
+                    <li class="p-4 text-center text-xs text-gray-400">No receipts yet.</li>
                     {% endfor %}
                 </ul>
             </div>
         </div>
 
-        <!-- CONDITIONAL TABS -->
+        <!-- TAB 2: INVENTORY -->
         {% if vendor.use_inventory %}
         <div id="tab-inventory" class="tab-content">
             <h2 class="text-lg font-black text-emerald-800 mb-4">Stock Manager</h2>
-            <p class="text-xs text-gray-500 mb-4">You have enabled Inventory. Feature coming fully online soon.</p>
+            <form onsubmit="addInventory(event)" class="flex gap-2 mb-6">
+                <input type="text" id="inv-name" placeholder="Item Name" required class="flex-1 bg-white border p-3 rounded-xl text-sm">
+                <input type="number" id="inv-qty" placeholder="Qty" required class="w-20 bg-white border p-3 rounded-xl text-sm">
+                <button type="submit" class="bg-emerald-700 text-white font-bold px-4 rounded-xl">+</button>
+            </form>
+            <div class="bg-white border rounded-2xl overflow-hidden">
+                <ul class="divide-y divide-gray-50">
+                    {% for item in inventory %}
+                    <li class="p-4 flex justify-between items-center">
+                        <p class="text-sm font-bold text-gray-800">{{ item.item_name }}</p>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold {% if item.stock_quantity < 5 %}text-red-500{% else %}text-emerald-700{% endif %}">{{ item.stock_quantity }} left</span>
+                            <button onclick="updateQty('{{ item.id }}', {{ item.stock_quantity + 1 }})" class="bg-gray-100 p-1 rounded">+</button>
+                            <button onclick="updateQty('{{ item.id }}', Math.max(0, {{ item.stock_quantity - 1 }}))" class="bg-gray-100 p-1 rounded">-</button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
         {% endif %}
 
+        <!-- TAB 3: EXPENSES -->
         {% if vendor.use_expenses %}
         <div id="tab-expenses" class="tab-content">
             <h2 class="text-lg font-black text-emerald-800 mb-4">Expense Tracker</h2>
-            <p class="text-xs text-gray-500 mb-4">You have enabled Expenses. Feature coming fully online soon.</p>
+            <form onsubmit="addExpense(event)" class="bg-white p-4 rounded-2xl border mb-6 space-y-3">
+                <input type="text" id="exp-desc" placeholder="What did you pay for? (e.g. Fuel)" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
+                <input type="number" id="exp-amount" placeholder="Amount (₦)" required class="w-full bg-gray-50 border p-3 rounded-xl text-sm">
+                <button type="submit" class="w-full bg-red-600 text-white font-bold text-sm py-3 rounded-xl">Record Expense</button>
+            </form>
+            <div class="bg-white border rounded-2xl overflow-hidden">
+                <ul class="divide-y divide-gray-50">
+                    {% for e in expenses %}
+                    <li class="p-4 flex justify-between items-center">
+                        <p class="text-sm font-bold text-gray-800">{{ e.description }}</p>
+                        <p class="text-sm font-black text-red-600">-₦{{ "{:,.0f}".format(e.amount) }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
         {% endif %}
 
+        <!-- TAB 4: CRM -->
         {% if vendor.use_crm %}
         <div id="tab-crm" class="tab-content">
             <h2 class="text-lg font-black text-emerald-800 mb-4">Customer Phonebook</h2>
-            <p class="text-xs text-gray-500 mb-4">You have enabled CRM. Feature coming fully online soon.</p>
+            <div class="bg-white border rounded-2xl overflow-hidden">
+                <ul class="divide-y divide-gray-50">
+                    {% for c in customers %}
+                    <li class="p-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-sm font-bold text-gray-800">{{ c.name }}</p>
+                            <p class="text-xs text-gray-500">{{ c.phone }}</p>
+                        </div>
+                        <a href="https://wa.me/234{{ c.phone[-10:] }}" target="_blank" class="bg-[#25D366] text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">WhatsApp</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
         {% endif %}
     </main>
@@ -163,22 +236,40 @@
 
     <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="fixed inset-0 bg-black/70 hidden z-50 flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-3xl p-6 relative">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 relative max-h-[90vh] overflow-y-auto">
             <h3 class="font-black text-lg text-emerald-800 mb-4 border-b pb-2">Business Settings</h3>
             <form onsubmit="saveSettings(event)" class="space-y-4">
-                <input type="text" id="set-biz" value="{{ vendor.business_name }}" class="w-full bg-gray-50 border p-3 rounded-xl text-sm font-bold" required>
-                <div class="space-y-3 py-2">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Business Name</label>
+                    <input type="text" id="set-biz" value="{{ vendor.business_name }}" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm" required>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Phone Number</label>
+                        <input type="text" id="set-phone" value="{{ vendor.phone or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">IG Handle</label>
+                        <input type="text" id="set-ig" value="{{ vendor.ig_handle or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Bank Details</label>
+                    <input type="text" id="set-bank" value="{{ vendor.bank_details or '' }}" class="w-full bg-gray-50 border p-2.5 rounded-xl text-sm">
+                </div>
+
+                <div class="space-y-3 py-2 border-t mt-2">
                     <p class="text-xs font-bold text-gray-500 uppercase">App Features (ERP)</p>
                     <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
-                        <span class="text-sm font-bold text-gray-700">📦 Enable Stock Manager</span>
+                        <span class="text-sm font-bold text-gray-700">📦 Stock Manager</span>
                         <input type="checkbox" id="set-inv" class="toggle" {% if vendor.use_inventory %}checked{% endif %}>
                     </label>
                     <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
-                        <span class="text-sm font-bold text-gray-700">💸 Enable Expenses Tracker</span>
+                        <span class="text-sm font-bold text-gray-700">💸 Expenses Tracker</span>
                         <input type="checkbox" id="set-exp" class="toggle" {% if vendor.use_expenses %}checked{% endif %}>
                     </label>
                     <label class="flex justify-between items-center bg-gray-50 p-3 rounded-xl">
-                        <span class="text-sm font-bold text-gray-700">👥 Enable Phonebook (CRM)</span>
+                        <span class="text-sm font-bold text-gray-700">👥 CRM Phonebook</span>
                         <input type="checkbox" id="set-crm" class="toggle" {% if vendor.use_crm %}checked{% endif %}>
                     </label>
                 </div>
@@ -195,27 +286,73 @@
             <div id="receipt-card-content" class="bg-emerald-50 border border-emerald-100 p-5 rounded-xl text-center relative overflow-hidden mb-4">
                 <div class="watermark-text" id="modal-watermark">VERIFIED</div>
                 <h3 id="modal-biz" class="font-extrabold text-emerald-900 text-base">BIZ</h3>
-                <span class="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">OFFICIAL INVOICE</span>
+                <span id="modal-badge" class="inline-block mt-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">OFFICIAL INVOICE</span>
                 <div class="text-xs mt-3 text-left space-y-1">
                     <p><b>Name:</b> <span id="modal-name"></span></p>
                     <p><b>Item:</b> <span id="modal-desc"></span></p>
+                    <p><b>Date:</b> <span id="modal-date"></span></p>
                     <p><b>Total:</b> <span id="modal-amt" class="text-emerald-700 font-black text-sm"></span></p>
+                    <div id="modal-bank-box" class="mt-2 pt-2 border-t border-emerald-200 hidden">
+                        <p class="font-bold">Bank Details:</p>
+                        <p id="modal-bank-text" class="text-[10px] text-gray-600"></p>
+                    </div>
                 </div>
             </div>
-            <button onclick="downloadImg()" class="w-full bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl flex justify-center items-center gap-2 mb-2">📸 Save Image</button>
-            <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="w-full bg-gray-100 text-gray-600 font-bold text-xs py-3 rounded-xl">Close</button>
+            
+            <div class="space-y-2">
+                <button id="mark-paid-btn" onclick="markAsPaid()" class="w-full bg-amber-500 text-white font-bold text-xs py-3 rounded-xl hidden">⚡ Mark as Paid</button>
+                <button onclick="downloadImg()" class="w-full bg-emerald-700 text-white font-bold text-xs py-3 rounded-xl">📸 Save Image (PNG)</button>
+                <button onclick="shareWhatsApp()" class="w-full bg-[#25D366] text-white font-bold text-xs py-3 rounded-xl">Share on WhatsApp</button>
+                <a id="pdf-link" href="#" target="_blank" class="block text-center w-full bg-gray-800 text-white font-bold text-xs py-3 rounded-xl">Download PDF</a>
+                <button onclick="document.getElementById('receipt-modal').classList.add('hidden')" class="w-full bg-gray-100 text-gray-600 font-bold text-xs py-3 rounded-xl">Close</button>
+            </div>
         </div>
     </div>
 
 {% endif %}
 
 <script>
+    function switchAuth(tab) {
+        document.getElementById('auth-error').classList.add('hidden');
+        if (tab === 'login') {
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('signup-form').classList.add('hidden');
+            document.getElementById('tab-login').className = "w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white";
+            document.getElementById('tab-signup').className = "w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg";
+        } else {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('signup-form').classList.remove('hidden');
+            document.getElementById('tab-signup').className = "w-1/2 py-2 text-xs font-bold rounded-lg bg-emerald-700 text-white";
+            document.getElementById('tab-login').className = "w-1/2 py-2 text-xs font-bold text-gray-500 rounded-lg";
+        }
+    }
+
     function handleLogin(e) {
         e.preventDefault();
         const fd = new FormData();
         fd.append('email', document.getElementById('l-email').value);
         fd.append('password', document.getElementById('l-pass').value);
-        fetch('/login', { method: 'POST', body: fd }).then(() => window.location.reload());
+        document.getElementById('btn-login').innerText = 'Logging in...';
+        fetch('/login', { method: 'POST', body: fd }).then(r=>r.json()).then(d => {
+            if(d.status === 'success') window.location.reload();
+            else { document.getElementById('auth-error').innerText = d.error; document.getElementById('auth-error').classList.remove('hidden'); document.getElementById('btn-login').innerText = 'Login to Dashboard'; }
+        });
+    }
+
+    function handleRegister(e) {
+        e.preventDefault();
+        const fd = new FormData();
+        fd.append('business_name', document.getElementById('r-biz').value);
+        fd.append('email', document.getElementById('r-email').value);
+        fd.append('password', document.getElementById('r-pass').value);
+        fd.append('phone', document.getElementById('r-phone').value);
+        fd.append('ig_handle', document.getElementById('r-ig').value);
+        fd.append('bank_details', document.getElementById('r-bank').value);
+        document.getElementById('btn-reg').innerText = 'Creating...';
+        fetch('/register', { method: 'POST', body: fd }).then(r=>r.json()).then(d => {
+            if(d.status === 'success') window.location.reload();
+            else { document.getElementById('auth-error').innerText = d.error; document.getElementById('auth-error').classList.remove('hidden'); document.getElementById('btn-reg').innerText = 'Create Account'; }
+        });
     }
 
     function navTab(tabId) {
@@ -226,7 +363,6 @@
         document.querySelector(`[data-tab="${tabId}"]`).classList.remove('text-gray-400');
     }
 
-    // SILENT UI UPDATE: No reloading!
     function addReceipt(e) {
         e.preventDefault();
         const btn = document.getElementById('btn-add-rec');
@@ -236,22 +372,24 @@
         const amount = parseFloat(document.getElementById('rec-amount').value);
         const desc = document.getElementById('rec-desc').value;
         const status = document.getElementById('rec-status').value;
+        
+        let invId = "";
+        const invSelect = document.getElementById('rec-inv');
+        if(invSelect) invId = invSelect.value;
 
         fetch('/add-receipt', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: name, phone: document.getElementById('rec-phone').value, amount: amount, status: status, desc: desc, inventory_id: document.getElementById('rec-inv').value })
+            body: JSON.stringify({ name: name, phone: document.getElementById('rec-phone').value, amount: amount, status: status, desc: desc, inventory_id: invId })
         }).then(res => res.json()).then(data => {
             if(data.status === 'success') {
-                // Instantly update Revenue if paid
                 if(status === 'paid') {
                     let revEl = document.getElementById('ui-revenue');
                     let newRev = parseFloat(revEl.getAttribute('data-val')) + amount;
                     revEl.setAttribute('data-val', newRev);
                     revEl.innerText = '₦' + newRev.toLocaleString();
                 }
-                
-                // Instantly inject new receipt at top of list
                 const list = document.getElementById('receipt-list');
+                if(list.innerText.includes("No receipts yet")) list.innerHTML = "";
                 const badge = status === 'pending' ? `<span class="text-[9px] font-black text-amber-600">PENDING</span>` : `<span class="text-[9px] font-black text-emerald-600">PAID</span>`;
                 const li = `<li onclick="openReceipt('${data.id}')" class="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer animate-pulse">
                                 <div><p class="text-sm font-bold text-gray-800">${name}</p><p class="text-xs text-gray-400">${desc}</p></div>
@@ -259,15 +397,33 @@
                             </li>`;
                 list.insertAdjacentHTML('afterbegin', li);
                 
-                // Update Invoice Count
                 let countEl = document.getElementById('ui-invoices');
                 countEl.innerText = parseInt(countEl.innerText) + 1;
 
-                // Reset Form
                 e.target.reset();
                 btn.innerText = 'Generate Receipt';
+            } else {
+                alert("Error saving: " + data.error);
+                btn.innerText = 'Generate Receipt';
             }
+        }).catch(err => {
+            alert("Network error.");
+            btn.innerText = 'Generate Receipt';
         });
+    }
+
+    function addExpense(e) {
+        e.preventDefault();
+        fetch('/add-expense', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: document.getElementById('exp-desc').value, amount: document.getElementById('exp-amount').value }) }).then(() => window.location.reload());
+    }
+
+    function addInventory(e) {
+        e.preventDefault();
+        fetch('/add-inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item_name: document.getElementById('inv-name').value, quantity: document.getElementById('inv-qty').value }) }).then(() => window.location.reload());
+    }
+
+    function updateQty(id, qty) {
+        fetch('/update-inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id, quantity: qty }) }).then(() => window.location.reload());
     }
 
     function saveSettings(e) {
@@ -278,11 +434,14 @@
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 business_name: document.getElementById('set-biz').value,
+                phone: document.getElementById('set-phone').value,
+                ig_handle: document.getElementById('set-ig').value,
+                bank_details: document.getElementById('set-bank').value,
                 use_inventory: document.getElementById('set-inv').checked,
                 use_expenses: document.getElementById('set-exp').checked,
                 use_crm: document.getElementById('set-crm').checked
             })
-        }).then(() => window.location.reload()); // Only reload when turning whole features on/off
+        }).then(() => window.location.reload());
     }
 
     let curRec = null;
@@ -292,18 +451,43 @@
             document.getElementById('modal-biz').innerText = d.business_name.toUpperCase();
             document.getElementById('modal-name').innerText = d.name;
             document.getElementById('modal-desc').innerText = d.desc;
+            document.getElementById('modal-date').innerText = d.date;
             document.getElementById('modal-amt').innerText = '₦' + d.amount.toLocaleString();
+            document.getElementById('pdf-link').href = '/download-pdf/' + d.id;
+            
+            if(d.bank_details) { document.getElementById('modal-bank-text').innerText = d.bank_details; document.getElementById('modal-bank-box').classList.remove('hidden'); }
+            else { document.getElementById('modal-bank-box').classList.add('hidden'); }
+
+            const mBtn = document.getElementById('mark-paid-btn');
+            const badge = document.getElementById('modal-badge');
+            if(d.status === 'pending') {
+                mBtn.classList.remove('hidden');
+                badge.innerText = "PENDING INVOICE";
+                badge.className = "inline-block mt-1 bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full";
+            } else {
+                mBtn.classList.add('hidden');
+                badge.innerText = "OFFICIAL INVOICE (PAID)";
+                badge.className = "inline-block mt-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full";
+            }
             document.getElementById('receipt-modal').classList.remove('hidden');
         });
     }
 
+    function markAsPaid() {
+        if(!curRec) return;
+        fetch('/mark-paid/' + curRec.id, { method: 'POST' }).then(() => window.location.reload());
+    }
+
     function downloadImg() {
         html2canvas(document.getElementById('receipt-card-content'), { scale: 3 }).then(canvas => {
-            let a = document.createElement('a');
-            a.download = `Receipt_${curRec.name}.png`;
-            a.href = canvas.toDataURL();
-            a.click();
+            let a = document.createElement('a'); a.download = `Receipt_${curRec.name}.png`; a.href = canvas.toDataURL(); a.click();
         });
+    }
+
+    function shareWhatsApp() {
+        if(!curRec) return;
+        const text = `Hello ${curRec.name},%0A%0AHere are your receipt details from *${curRec.business_name}*:%0A%0A*Item:* ${curRec.desc}%0A*Amount:* ₦${curRec.amount.toLocaleString()}%0A*Status:* ${curRec.status.toUpperCase()}%0A*Date:* ${curRec.date}%0A%0AThank you for your business!`;
+        window.open(`https://wa.me/?text=${text}`, '_blank');
     }
 </script>
 </body>
