@@ -61,6 +61,7 @@ def home():
         net_profit = total_revenue - total_expenses
         total_invoices = len(receipts)
     except Exception as e:
+        print(f"Home route error: {e}")
         receipts, expenses, inventory, customers = [], [], [], []
         total_revenue, total_expenses, net_profit, total_invoices = 0, 0, 0, 0
 
@@ -151,6 +152,55 @@ def add_receipt():
                 supabase.table('inventory').update({'stock_quantity': new_qty}).eq('id', inv_id).execute()
 
         return jsonify({"status": "success", "id": res.data[0]['id']})
+    except Exception as e:
+        print(f"Add Receipt Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/add-expense', methods=['POST'])
+def add_expense():
+    vendor = get_current_vendor()
+    if not vendor: return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.json
+        supabase.table('expenses').insert({
+            "vendor_id": vendor['id'],
+            "description": data.get('description'),
+            "amount": float(data.get('amount'))
+        }).execute()
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/add-inventory', methods=['POST'])
+def add_inventory():
+    vendor = get_current_vendor()
+    if not vendor: return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.json
+        supabase.table('inventory').insert({
+            "vendor_id": vendor['id'],
+            "item_name": data.get('item_name'),
+            "stock_quantity": int(data.get('quantity'))
+        }).execute()
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/update-inventory', methods=['POST'])
+def update_inventory():
+    vendor = get_current_vendor()
+    if not vendor: return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.json
+        supabase.table('inventory').update({"stock_quantity": int(data.get('quantity'))}).eq('id', data.get('id')).eq('vendor_id', vendor['id']).execute()
+        return jsonify({"status": "success"})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/mark-paid/<int:receipt_id>', methods=['POST'])
+def mark_paid(receipt_id):
+    vendor = get_current_vendor()
+    if not vendor: return jsonify({"error": "Unauthorized"}), 401
+    try:
+        supabase.table('receipts').update({'status': 'paid'}).eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
+        return jsonify({"status": "success"})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/receipt/<int:receipt_id>')
@@ -167,6 +217,40 @@ def get_receipt(receipt_id):
             "ig_handle": vendor.get('ig_handle', ''), "bank_details": vendor.get('bank_details', '')
         })
     return jsonify({"error": "Not found"}), 404
+
+@app.route('/download-pdf/<int:receipt_id>')
+def download_pdf(receipt_id):
+    vendor = get_current_vendor()
+    if not vendor: return "Unauthorized", 401
+
+    res = supabase.table('receipts').select('*').eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
+    if not res.data: return "Receipt not found", 404
+
+    row = res.data[0]
+    pdf_filename = f"receipt_{receipt_id}.pdf"
+    pdf_path = os.path.join(PDF_DIR, pdf_filename)
+
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    story.append(Paragraph(f"<b>{vendor['business_name'].upper()}</b>", styles['Title']))
+    story.append(Paragraph(f"Phone: {vendor.get('phone', '')} | IG: {vendor.get('ig_handle', '')}", styles['Normal']))
+    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"<b>OFFICIAL INVOICE #{row['id']}</b>", styles['Heading2']))
+    story.append(Paragraph(f"<b>Status:</b> {row['status'].upper()}", styles['Normal']))
+    story.append(Paragraph(f"<b>Date:</b> {row['date'][:10]}", styles['Normal']))
+    story.append(Paragraph(f"<b>Customer Name:</b> {row['customer_name']}", styles['Normal']))
+    story.append(Paragraph(f"<b>Item Description:</b> {row['item_desc']}", styles['Normal']))
+    story.append(Paragraph(f"<b>Amount Paid:</b> NGN {float(row['amount']):,.2f}", styles['Heading1']))
+    if vendor.get('bank_details'):
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"<b>Bank Details:</b> {vendor['bank_details']}", styles['Normal']))
+    story.append(Spacer(1, 20))
+    story.append(Paragraph("<i>Thank you for your patronage! Verified by VendorDesk.</i>", styles['Italic']))
+
+    doc.build(story)
+    return send_file(pdf_path, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
