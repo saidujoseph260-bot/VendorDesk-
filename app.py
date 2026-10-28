@@ -25,15 +25,12 @@ if not os.path.exists(PDF_DIR):
     os.makedirs(PDF_DIR)
 
 @app.route('/ping')
-def ping():
-    return "OK", 200
+def ping(): return "OK", 200
 
 @app.route('/icon.png')
 def serve_icon():
-    if os.path.exists('icon.png'):
-        return send_file('icon.png')
-    elif os.path.exists('static/icon.png'):
-        return send_file('static/icon.png')
+    if os.path.exists('icon.png'): return send_file('icon.png')
+    elif os.path.exists('static/icon.png'): return send_file('static/icon.png')
     return "Icon not found", 404
 
 def get_current_vendor():
@@ -49,9 +46,32 @@ def home():
     vendor = get_current_vendor()
     if not vendor: return render_template('index.html', vendor=None)
 
+    time_filter = request.args.get('filter', 'all')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
     try:
         vid = vendor['id']
-        receipts = supabase.table('receipts').select('*').eq('vendor_id', vid).order('id', desc=True).execute().data or []
+        
+        # DATE RANGE LOGIC
+        query = supabase.table('receipts').select('*').eq('vendor_id', vid)
+        now = datetime.utcnow()
+        if time_filter == 'today':
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            query = query.gte('date', today_start)
+        elif time_filter == 'week':
+            week_start = (now - timedelta(days=7)).isoformat()
+            query = query.gte('date', week_start)
+        elif time_filter == 'month':
+            month_start = (now - timedelta(days=30)).isoformat()
+            query = query.gte('date', month_start)
+        elif time_filter == 'year':
+            year_start = (now - timedelta(days=365)).isoformat()
+            query = query.gte('date', year_start)
+        elif time_filter == 'custom' and start_date and end_date:
+            query = query.gte('date', f"{start_date}T00:00:00").lte('date', f"{end_date}T23:59:59")
+
+        receipts = query.order('id', desc=True).execute().data or []
         expenses = supabase.table('expenses').select('*').eq('vendor_id', vid).order('id', desc=True).execute().data or [] if vendor.get('use_expenses') else []
         inventory = supabase.table('inventory').select('*').eq('vendor_id', vid).order('item_name').execute().data or [] if vendor.get('use_inventory') else []
         customers = supabase.table('customers').select('*').eq('vendor_id', vid).order('name').execute().data or [] if vendor.get('use_crm') else []
@@ -68,7 +88,8 @@ def home():
     return render_template(
         'index.html', vendor=vendor, revenue=total_revenue, expenses_total=total_expenses,
         net_profit=net_profit, invoices=total_invoices, receipts=receipts,
-        expenses=expenses, inventory=inventory, customers=customers
+        expenses=expenses, inventory=inventory, customers=customers,
+        current_filter=time_filter, start_date=start_date, end_date=end_date
     )
 
 @app.route('/register', methods=['POST'])
@@ -76,9 +97,7 @@ def register():
     try:
         data = request.form
         email = data.get('email', '').lower().strip()
-        existing = supabase.table('vendors').select('id').eq('email', email).execute()
-        if existing.data: return jsonify({"error": "Email already registered."}), 400
-        
+        if supabase.table('vendors').select('id').eq('email', email).execute().data: return jsonify({"error": "Email already registered."}), 400
         new_vendor = {
             "email": email, "password_hash": generate_password_hash(data.get('password')),
             "business_name": data.get('business_name'), "phone": data.get('phone'),
@@ -116,12 +135,9 @@ def update_profile():
     try:
         data = request.json
         supabase.table('vendors').update({
-            "business_name": data.get('business_name'),
-            "phone": data.get('phone'),
-            "ig_handle": data.get('ig_handle'),
-            "bank_details": data.get('bank_details'),
-            "use_inventory": data.get('use_inventory', False),
-            "use_expenses": data.get('use_expenses', False),
+            "business_name": data.get('business_name'), "phone": data.get('phone'),
+            "ig_handle": data.get('ig_handle'), "bank_details": data.get('bank_details'),
+            "use_inventory": data.get('use_inventory', False), "use_expenses": data.get('use_expenses', False),
             "use_crm": data.get('use_crm', False)
         }).eq('id', vendor['id']).execute()
         return jsonify({"status": "success"})
@@ -139,21 +155,27 @@ def add_receipt():
         }
         res = supabase.table('receipts').insert(new_receipt).execute()
         
+        # FAILSAFE CRM INSERT
         phone = data.get('phone')
         if phone and vendor.get('use_crm'):
-            ext = supabase.table('customers').select('*').eq('vendor_id', vendor['id']).eq('phone', phone).execute()
-            if not ext.data: supabase.table('customers').insert({"vendor_id": vendor['id'], "name": data.get('name'), "phone": phone}).execute()
+            try:
+                ext = supabase.table('customers').select('*').eq('vendor_id', vendor['id']).eq('phone', phone).execute()
+                if not ext.data: supabase.table('customers').insert({"vendor_id": vendor['id'], "name": data.get('name'), "phone": phone}).execute()
+            except Exception as e: print(f"CRM Save Error: {e}")
 
+        # FAILSAFE INVENTORY DEDUCT
         inv_id = data.get('inventory_id')
         if inv_id and vendor.get('use_inventory'):
-            item = supabase.table('inventory').select('stock_quantity').eq('id', inv_id).execute()
-            if item.data:
-                new_qty = max(0, item.data[0]['stock_quantity'] - 1)
-                supabase.table('inventory').update({'stock_quantity': new_qty}).eq('id', inv_id).execute()
+            try:
+                item = supabase.table('inventory').select('stock_quantity').eq('id', inv_id).execute()
+                if item.data:
+                    new_qty = max(0, item.data[0]['stock_quantity'] - 1)
+                    supabase.table('inventory').update({'stock_quantity': new_qty}).eq('id', inv_id).execute()
+            except Exception as e: print(f"Inventory Deduct Error: {e}")
 
         return jsonify({"status": "success", "id": res.data[0]['id']})
     except Exception as e:
-        print(f"Add Receipt Error: {e}")
+        print(f"Receipt Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/add-expense', methods=['POST'])
@@ -162,11 +184,7 @@ def add_expense():
     if not vendor: return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.json
-        supabase.table('expenses').insert({
-            "vendor_id": vendor['id'],
-            "description": data.get('description'),
-            "amount": float(data.get('amount'))
-        }).execute()
+        supabase.table('expenses').insert({ "vendor_id": vendor['id'], "description": data.get('description'), "amount": float(data.get('amount')) }).execute()
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -176,11 +194,7 @@ def add_inventory():
     if not vendor: return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.json
-        supabase.table('inventory').insert({
-            "vendor_id": vendor['id'],
-            "item_name": data.get('item_name'),
-            "stock_quantity": int(data.get('quantity'))
-        }).execute()
+        supabase.table('inventory').insert({ "vendor_id": vendor['id'], "item_name": data.get('item_name'), "stock_quantity": int(data.get('quantity')) }).execute()
         return jsonify({"status": "success"})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -222,18 +236,14 @@ def get_receipt(receipt_id):
 def download_pdf(receipt_id):
     vendor = get_current_vendor()
     if not vendor: return "Unauthorized", 401
-
     res = supabase.table('receipts').select('*').eq('id', receipt_id).eq('vendor_id', vendor['id']).execute()
     if not res.data: return "Receipt not found", 404
-
     row = res.data[0]
     pdf_filename = f"receipt_{receipt_id}.pdf"
     pdf_path = os.path.join(PDF_DIR, pdf_filename)
-
     doc = SimpleDocTemplate(pdf_path, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
-
     story.append(Paragraph(f"<b>{vendor['business_name'].upper()}</b>", styles['Title']))
     story.append(Paragraph(f"Phone: {vendor.get('phone', '')} | IG: {vendor.get('ig_handle', '')}", styles['Normal']))
     story.append(Spacer(1, 15))
@@ -248,7 +258,6 @@ def download_pdf(receipt_id):
         story.append(Paragraph(f"<b>Bank Details:</b> {vendor['bank_details']}", styles['Normal']))
     story.append(Spacer(1, 20))
     story.append(Paragraph("<i>Thank you for your patronage! Verified by VendorDesk.</i>", styles['Italic']))
-
     doc.build(story)
     return send_file(pdf_path, as_attachment=True)
 
